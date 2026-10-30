@@ -1,13 +1,13 @@
 from prettytable import PrettyTable
 
-from .decorators import confirm_action, handle_db_errors, log_time
-from .utils import create_cacher, load_table_data
-
+from .decorators import confirm_action, create_cacher, handle_db_errors, log_time
+from .utils import load_table_data
 cache_result, clear_cache = create_cacher()
 
 
 @handle_db_errors
 def create_table(metadata, table_name, columns):
+    """Создает таблицу"""
     if table_name in metadata:
         raise ValueError(f"Таблица '{table_name}' уже существует")
     allowed_types = ["int", "str", "bool"]
@@ -29,6 +29,7 @@ def create_table(metadata, table_name, columns):
 @log_time
 @handle_db_errors
 def insert(metadata, table_name, values):
+    """Добавляет новую запись в таблицу"""
     if table_name not in metadata:
         raise KeyError(f"Таблица '{table_name}' не существует")
     columns = metadata[table_name]
@@ -65,6 +66,7 @@ def insert(metadata, table_name, values):
 @log_time
 @handle_db_errors
 def select(table_name, where_clause=None):
+    """Возвращает записи таблицы с учетом условия"""
     def get_data():
         data = load_table_data(table_name)
         if where_clause is None:
@@ -85,6 +87,7 @@ def select(table_name, where_clause=None):
 
 @confirm_action("удаление таблицы")
 def drop_table(metadata, table_name):
+    """Удаляет таблицу"""
     if table_name not in metadata:
         raise KeyError(f"Таблица '{table_name}' не существует")
     del metadata[table_name]
@@ -95,11 +98,13 @@ def drop_table(metadata, table_name):
 
 
 def list_tables(metadata):
+    """Выводит список таблиц"""
     for table_name in metadata:
         print(table_name)
 
 
 def print_formatted_table(data):
+    """Выводит записи в виде таблицы"""
     if not data:
         print("Пусто")
         return
@@ -113,6 +118,7 @@ def print_formatted_table(data):
 @handle_db_errors
 @confirm_action("удаление записей")
 def delete(table_data, where_clause):
+    """Удаляет записи, соответствующие условию"""
     column_name = list(where_clause.keys())[0]
     value = list(where_clause.values())[0]
     if table_data and column_name not in table_data[0]:
@@ -127,6 +133,7 @@ def delete(table_data, where_clause):
 
 @handle_db_errors
 def info(metadata, table_name):
+    """Выводит информацию о структуре таблицы"""
     if table_name not in metadata:
         raise KeyError(f'Таблица "{table_name}" не существует')
     columns = metadata[table_name]
@@ -141,6 +148,7 @@ def info(metadata, table_name):
 
 @handle_db_errors
 def update(table_data, set_clause, where_clause):
+    """Изменяет значения столбцов в записях"""
     set_column = list(set_clause.keys())[0]
     set_value = list(set_clause.values())[0]
     where_column = list(where_clause.keys())[0]

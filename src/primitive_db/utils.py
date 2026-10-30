@@ -1,8 +1,10 @@
 import json
 import os
 
+from .constants import DATA_DIR
 
 def load_metadata(filepath):
+    """Загружает метаданные из файла"""
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -12,8 +14,9 @@ def load_metadata(filepath):
 
 
 def load_table_data(table_name):
+    """Загружает метаданные таблиц изфайла"""
     try:
-        with open(f"data/{table_name}.json", "r", encoding="utf-8") as f:
+        with open(f"{DATA_DIR}/{table_name}.json", "r", encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:
         return []
@@ -21,23 +24,13 @@ def load_table_data(table_name):
 
 
 def save_metadata(filepath, data):
+    """Сохраняет метаданные в файл"""
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 def save_table_data(table_name, data):
-    os.makedirs("data", exist_ok=True)
-    with open(f"data/{table_name}.json", "w", encoding="utf-8") as f:
+    """Сохраняет метаданные таблицы в файл"""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(f"{DATA_DIR}/{table_name}.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-
-def create_cacher():
-    cache = {}
-    def cache_result(key, value_func):
-        if key in cache:
-            return cache[key]
-        result = value_func()
-        cache[key] = result
-        return result
-    def clear_cache():
-        cache.clear()
-    return cache_result, clear_cache

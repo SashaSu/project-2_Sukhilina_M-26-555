@@ -28,9 +28,9 @@ from .utils import (
     save_table_data,
 )
 
-
+from .constants import META_FILE
 def print_help():
-    """Prints the help message for the current mode."""
+    """Выводит справку по доступным командам"""
 
     print("\n***Процесс работы с таблицей***")
     print("Функции:")
@@ -55,9 +55,10 @@ def print_help():
 
 
 def run():
+    """Запускает основной цикл"""
     print("***База данных***")
     print_help()
-    filepath = "db_meta.json"
+    filepath = META_FILE
     metadata = load_metadata(filepath)
     while True:
         command = prompt.string("Введите команду: ")

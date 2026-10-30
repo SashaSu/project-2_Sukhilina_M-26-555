@@ -4,3 +4,5 @@ __pycache__/
 *.egg-info/
 .idea/
 *.cast
+data/
+db_meta.json

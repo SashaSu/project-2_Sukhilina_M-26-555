@@ -1,38 +1,40 @@
 from prettytable import PrettyTable
 
-from .utils import load_table_data
+from .decorators import confirm_action, handle_db_errors, log_time
+from .utils import create_cacher, load_table_data
+
+cache_result, clear_cache = create_cacher()
 
 
+@handle_db_errors
 def create_table(metadata, table_name, columns):
     if table_name in metadata:
-        print(f"Таблица '{table_name}' уже существует")
-        return None
+        raise ValueError(f"Таблица '{table_name}' уже существует")
     allowed_types = ["int", "str", "bool"]
     table_columns = {"ID": "int"}
     for column in columns:
         args = column.split(":")
         if len(args) != 2:
-            print("Неверное количество аргументов")
-            return None
+            raise ValueError("Неверный формат описания столбца")
         column_name, column_type = args
         if column_type not in allowed_types or not column_name:
-            print(f"Неверный тип столбца '{column}'")
-            return None
+            raise ValueError(f"Неверный тип или имя столбца '{column}'")
         if column_name.upper() != "ID":
             table_columns[column_name] = column_type
     metadata[table_name] = table_columns
+    clear_cache()
     return metadata
 
 
+@log_time
+@handle_db_errors
 def insert(metadata, table_name, values):
     if table_name not in metadata:
-        print(f"Таблицы {table_name} не существует")
-        return None
+        raise KeyError(f"Таблица '{table_name}' не существует")
     columns = metadata[table_name]
     column_names = list(columns.keys())
     if len(column_names) - 1 != len(values):
-        print("Неверное количество значений")
-        return None
+        raise ValueError("Неверное количество значений")
     table_data = load_table_data(table_name)
     if table_data:
         new_id = max(record["ID"] for record in table_data) + 1
@@ -47,39 +49,48 @@ def insert(metadata, table_name, values):
         match column_type:
             case "int":
                 if type(cur_value) is not int:
-                    print(f"Столбец '{column_name}' должен иметь тип int")
-                    return None
+                    raise ValueError(f"Столбец '{column_name}' должен иметь тип int")
             case "str":
                 if type(cur_value) is not str:
-                    print(f"Столбец '{column_name}' должен иметь тип str")
-                    return None
+                    raise ValueError(f"Столбец '{column_name}' должен иметь тип str")
             case "bool":
                 if type(cur_value) is not bool:
-                    print(f"Столбец '{column_name}' должен иметь тип bool")
-                    return None
+                    raise ValueError(f"Столбец '{column_name}' должен иметь тип bool")
         new_record[column_name] = cur_value
     table_data.append(new_record)
+    clear_cache()
     return table_data
 
 
+@log_time
+@handle_db_errors
 def select(table_name, where_clause=None):
-    data = load_table_data(table_name)
+    def get_data():
+        data = load_table_data(table_name)
+        if where_clause is None:
+            return data
+        column_name = list(where_clause.keys())[0]
+        value = list(where_clause.values())[0]
+        result = []
+        for record in data:
+            if record[column_name] == value:
+                result.append(record)
+        return result
     if where_clause is None:
-        return data
-    column_name = list(where_clause.keys())[0]
-    value = list(where_clause.values())[0]
-    result = []
-    for record in data:
-        if record[column_name] == value:
-            result.append(record)
-    return result
-
-
-def drop_table(metadata, table_name):
-    if table_name in metadata:
-        del metadata[table_name]
+        key = (table_name, None)
     else:
-        print("Таблица не существует")
+        key = (table_name, str(where_clause))
+    return cache_result(key, get_data)
+
+
+@confirm_action("удаление таблицы")
+def drop_table(metadata, table_name):
+    if table_name not in metadata:
+        raise KeyError(f"Таблица '{table_name}' не существует")
+    del metadata[table_name]
+    with open(f"data/{table_name}.json", "w", encoding="utf-8") as f:
+        f.write("[]")
+    clear_cache()
     return metadata
 
 
@@ -99,23 +110,25 @@ def print_formatted_table(data):
     print(table)
 
 
+@handle_db_errors
+@confirm_action("удаление записей")
 def delete(table_data, where_clause):
     column_name = list(where_clause.keys())[0]
     value = list(where_clause.values())[0]
     if table_data and column_name not in table_data[0]:
-        print(f"Столбца {column_name} не существует")
-        return None
+        raise KeyError(f"Столбец '{column_name}' не существует")
     result = []
     for record in table_data:
         if record[column_name] != value:
             result.append(record)
+    clear_cache()
     return result
 
 
+@handle_db_errors
 def info(metadata, table_name):
     if table_name not in metadata:
-        print(f'Таблица "{table_name}" не существует')
-        return
+        raise KeyError(f'Таблица "{table_name}" не существует')
     columns = metadata[table_name]
     data = load_table_data(table_name)
     print(f"Таблица: {table_name}")
@@ -126,6 +139,7 @@ def info(metadata, table_name):
     print(f"Количество записей: {len(data)}")
 
 
+@handle_db_errors
 def update(table_data, set_clause, where_clause):
     set_column = list(set_clause.keys())[0]
     set_value = list(set_clause.values())[0]
@@ -134,4 +148,5 @@ def update(table_data, set_clause, where_clause):
     for record in table_data:
         if record[where_column] == where_value:
             record[set_column] = set_value
+    clear_cache()
     return table_data
